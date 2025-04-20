@@ -1,7 +1,8 @@
-// File: screens/destinations_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yatrasahayak_app/theme/theme_provider.dart';
+import 'package:yatrasahayak_app/services/destination_service.dart';
 
 class DestinationsScreen extends StatefulWidget {
   @override
@@ -12,6 +13,25 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
   String _selectedSeason = 'Summer';
   late TabController _tabController;
   
+  // Create an instance of the destination service
+  final DestinationService _destinationService = DestinationService();
+  
+  // Map to store fetched recommendations for each season
+  Map<String, List<Map<String, dynamic>>> _destinationsBySeason = {
+    'Spring': [],
+    'Summer': [],
+    'Autumn': [],
+    'Winter': [],
+  };
+  
+  // Loading states for each season
+  Map<String, bool> _isLoading = {
+    'Spring': false,
+    'Summer': false,
+    'Autumn': false,
+    'Winter': false,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -34,10 +54,16 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
               break;
           }
         });
+        // Fetch recommendations for the newly selected season
+        _fetchRecommendations(_selectedSeason);
       }
     });
+    
     // Default to Summer tab
     _tabController.animateTo(1);
+    
+    // Fetch recommendations for the default season (Summer)
+    _fetchRecommendations('Summer');
   }
 
   @override
@@ -46,104 +72,45 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
     super.dispose();
   }
   
-  // Sample destination data
-  final Map<String, List<Map<String, dynamic>>> _destinationsBySeason = {
-    'Spring': [
-      {
-        'name': 'Kyoto',
-        'country': 'Japan',
-        'description': 'Cherry blossoms and traditional gardens',
-        'rating': 4.8,
-        'color': Color(0xFFE879F9),
-      },
-      {
-        'name': 'Amsterdam',
-        'country': 'Netherlands',
-        'description': 'Tulip fields and canal cruises',
-        'rating': 4.6,
-        'color': Color(0xFF38BDF8),
-      },
-      {
-        'name': 'Paris',
-        'country': 'France',
-        'description': 'Gardens bloom with mild weather',
-        'rating': 4.7,
-        'color': Color(0xFF34D399),
-      },
-    ],
-    'Summer': [
-      {
-        'name': 'Santorini',
-        'country': 'Greece',
-        'description': 'Stunning beaches and white architecture',
-        'rating': 4.9,
-        'color': Color(0xFF2DD4BF),
-      },
-      {
-        'name': 'Bali',
-        'country': 'Indonesia',
-        'description': 'Tropical paradise with lush landscapes',
-        'rating': 4.7,
-        'color': Color(0xFFA78BFA),
-      },
-      {
-        'name': 'Barcelona',
-        'country': 'Spain',
-        'description': 'Vibrant city with beautiful beaches',
-        'rating': 4.8,
-        'color': Color(0xFFF97316),
-      },
-    ],
-    'Autumn': [
-      {
-        'name': 'Kyoto',
-        'country': 'Japan',
-        'description': 'Brilliant autumn foliage and temples',
-        'rating': 4.9,
-        'color': Color(0xFFF59E0B),
-      },
-      {
-        'name': 'New England',
-        'country': 'USA',
-        'description': 'Spectacular fall colors and cozy towns',
-        'rating': 4.7,
-        'color': Color(0xFFEF4444),
-      },
-      {
-        'name': 'Bavaria',
-        'country': 'Germany',
-        'description': 'Fairytale castles with autumn colors',
-        'rating': 4.6,
-        'color': Color(0xFF6366F1),
-      },
-    ],
-    'Winter': [
-      {
-      'name': 'Lapland',
-        'country': 'Finland',
-        'description': 'Northern lights and winter activities',
-        'rating': 4.8,
-        'color': Color(0xFF60A5FA),
-      },
-      {
-        'name': 'Swiss Alps',
-        'country': 'Switzerland',
-        'description': 'World-class skiing and mountain views',
-        'rating': 4.9,
-        'color': Color(0xFF8B5CF6),
-      },
-      {
-        'name': 'Prague',
-        'country': 'Czech Republic',
-        'description': 'Magical Christmas markets and snow',
-        'rating': 4.7,
-        'color': Color(0xFFF43F5E),
-      },
-    ],
-  };
+  // Fetch recommendations from the API
+  Future<void> _fetchRecommendations(String season) async {
+    // Skip if we already have data or are currently loading
+    if (_destinationsBySeason[season]!.isNotEmpty || _isLoading[season]!) {
+      return;
+    }
+    
+    setState(() {
+      _isLoading[season] = true;
+    });
+    
+    try {
+      final recommendations = await _destinationService.getRecommendations(season, count: 5);
+      
+      setState(() {
+        _destinationsBySeason[season] = recommendations;
+        _isLoading[season] = false;
+      });
+    } catch (e) {
+      print('Error fetching recommendations: $e');
+      setState(() {
+        _isLoading[season] = false;
+        // Set default values in case of error
+        _destinationsBySeason[season] = [
+          {
+            'name': 'Error loading destinations',
+            'country': 'Please try again later',
+            'description': 'Could not connect to the recommendation service.',
+            'rating': 0.0,
+            'color': Color(0xFFE53935),
+          }
+        ];
+      });
+    }
+  }
 
   // Get season icon
   IconData _getSeasonIcon(String season) {
+    // Existing code remains the same
     switch (season) {
       case 'Spring':
         return Icons.eco_rounded;
@@ -160,6 +127,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
 
   // Get season color
   Color _getSeasonColor(String season) {
+    // Existing code remains the same
     switch (season) {
       case 'Spring':
         return Color(0xFF7ED957);
@@ -176,6 +144,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    // Existing build method remains largely unchanged
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final seasonColor = _getSeasonColor(_selectedSeason);
@@ -184,6 +153,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
       body: SafeArea(
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
+            // Existing code remains the same
             return [
               SliverAppBar(
                 floating: true,
@@ -395,7 +365,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Recommended destinations for this season',
+                          'ML Recommended destinations for this season',
                           style: TextStyle(
                             fontSize: 14,
                             color:
@@ -412,7 +382,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
 
               SizedBox(height: 24),
 
-              // Destinations list
+              // Destinations list with TabBarView
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -432,14 +402,79 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
   }
 
   Widget _buildDestinationsList(String season) {
-    final destinations = _destinationsBySeason[season] ?? [];
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final destinations = _destinationsBySeason[season] ?? [];
+    
+    // Show loading indicator while fetching data
+    if (_isLoading[season]!) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: _getSeasonColor(season),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Finding best $season destinations...',
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Show empty state if no destinations and not loading
+    if (destinations.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.travel_explore,
+              size: 60,
+              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No destinations available for $season',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+              ),
+            ),
+            SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                _fetchRecommendations(season);
+              },
+              icon: Icon(Icons.refresh),
+              label: Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _getSeasonColor(season),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
+    // Show destination cards
     return ListView.builder(
       padding: EdgeInsets.symmetric(horizontal: 16),
       itemCount: destinations.length,
       itemBuilder: (context, index) {
         final destination = destinations[index];
+        Color cardColor = destination['color'] is int 
+            ? Color(destination['color']) 
+            : Color(0xFF38BDF8); // Default color
+            
         return Container(
           margin: EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
@@ -466,8 +501,8 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        destination['color'],
-                        destination['color'].withOpacity(0.8),
+                        cardColor,
+                        cardColor.withOpacity(0.8),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -496,7 +531,11 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.star, color: Colors.amber, size: 16),
+                              Icon(
+                                Icons.star, 
+                                color: Colors.amber, 
+                                size: 16
+                              ),
                               SizedBox(width: 4),
                               Text(
                                 destination['rating'].toString(),
@@ -620,16 +659,15 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 padding: EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: Text('View Details'),
-                            ),
+                             ),
+                             child: Text('View Details'),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+            )],
             ),
           ),
         );
