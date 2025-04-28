@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yatrasahayak_app/theme/theme_provider.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:yatrasahayak_app/widgets/feature_card.dart';
+import 'package:yatrasahayak_app/screens/destinations_screen.dart';
+import 'package:yatrasahayak_app/screens/statistics_screen.dart';
+import 'package:yatrasahayak_app/screens/itinerary_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -10,28 +12,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Featured destinations data
-  final List<Map<String, dynamic>> _featuredDestinations = [
-    {
-      'name': 'Bali',
-      'country': 'Indonesia',
-      'image': 'assets/images/bali.jpg',
-      'rating': 4.8,
-    },
-    {
-      'name': 'Santorini',
-      'country': 'Greece',
-      'image': 'assets/images/santorini.jpg',
-      'rating': 4.9,
-    },
-    {
-      'name': 'Kyoto',
-      'country': 'Japan',
-      'image': 'assets/images/kyoto.jpg',
-      'rating': 4.7,
-    },
-  ];
-
   // Season recommendations
   final List<Map<String, dynamic>> _seasonRecommendations = [
     {'season': 'Spring', 'icon': Icons.eco_rounded, 'color': Color(0xFF7ED957)},
@@ -96,13 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     themeProvider.toggleTheme();
                   },
                 ),
-                IconButton(
-                  icon: Icon(
-                    Icons.notifications_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  onPressed: () {},
-                ),
                 SizedBox(width: 8),
               ],
             ),
@@ -154,120 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: TextStyle(fontSize: 16),
                             ),
                           ),
-                          Container(
-                            padding: EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.tune_rounded,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 20,
-                            ),
-                          ),
                         ],
                       ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Featured destinations list (replacing carousel)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Featured Destinations',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onBackground,
-                          ),
-                        ),
-                        SizedBox(height: 12),
-                        SizedBox(
-                          height: 180,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _featuredDestinations.length,
-                            itemBuilder: (context, index) {
-                              final destination = _featuredDestinations[index];
-                              return Container(
-                                width: 160,
-                                margin: EdgeInsets.only(
-                                  right:
-                                      index == _featuredDestinations.length - 1
-                                          ? 0
-                                          : 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Theme.of(context).colorScheme.primary,
-                                      Theme.of(context).colorScheme.secondary,
-                                    ],
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Expanded(
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.vertical(
-                                          top: Radius.circular(12),
-                                        ),
-                                        child: Icon(
-                                          Icons.landscape,
-                                          size: 60,
-                                          color: Colors.white70,
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            destination['name'],
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.location_on,
-                                                size: 14,
-                                                color: Colors.white70,
-                                              ),
-                                              SizedBox(width: 4),
-                                              Text(
-                                                destination['country'],
-                                                style: TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
                     ),
 
                     SizedBox(height: 30),
@@ -285,7 +146,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DestinationsScreen(),
+                              ),
+                            );
+                          },
                           child: Text(
                             'See All',
                             style: TextStyle(
@@ -305,7 +173,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       children:
                           _seasonRecommendations.map((season) {
                             return InkWell(
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => DestinationsScreen(
+                                          initialSeason: season['season'],
+                                        ),
+                                  ),
+                                );
+                              },
                               child: Column(
                                 children: [
                                   Container(
@@ -355,51 +233,59 @@ class _HomeScreenState extends State<HomeScreen> {
                     SizedBox(height: 16),
 
                     // Feature cards
-                    Row(
+                    Column(
                       children: [
-                        Expanded(
+                        Container(
+                          width: double.infinity,
+                          margin: EdgeInsets.only(bottom: 16),
                           child: FeatureCard(
                             icon: Icons.explore_rounded,
                             title: 'Destinations',
                             subtitle: 'Find perfect places',
                             color: Theme.of(context).colorScheme.primary,
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DestinationsScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                        SizedBox(width: 16),
-                        Expanded(
+                        Container(
+                          width: double.infinity,
+                          margin: EdgeInsets.only(bottom: 16),
                           child: FeatureCard(
                             icon: Icons.analytics_rounded,
                             title: 'Statistics',
                             subtitle: 'Traveler counts',
                             color: Theme.of(context).colorScheme.secondary,
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => StatisticsScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      ],
-                    ),
-
-                    SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
+                        Container(
+                          width: double.infinity,
                           child: FeatureCard(
                             icon: Icons.map_rounded,
                             title: 'Itinerary',
                             subtitle: 'Plan your trip',
                             color: Theme.of(context).colorScheme.tertiary,
-                            onTap: () {},
-                          ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: FeatureCard(
-                            icon: Icons.travel_explore_rounded,
-                            title: 'Experiences',
-                            subtitle: 'Unique activities',
-                            color: Color(0xFFAC6DDE),
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ItineraryScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:yatrasahayak_app/theme/theme_provider.dart';
-import 'package:yatrasahayak_app/widgets/feature_card.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import '../services/itinerary_service.dart';
+import '../models/itinerary.dart';
 
 class ItineraryScreen extends StatefulWidget {
   @override
@@ -9,863 +14,344 @@ class ItineraryScreen extends StatefulWidget {
 }
 
 class _ItineraryScreenState extends State<ItineraryScreen> {
-  // Selected values for the form
-  String _selectedDestination = 'Bali';
-  String _selectedDuration = '3 days';
-  String _selectedTravelStyle = 'Adventure';
-  double _budgetValue = 500;
+  final ItineraryService _itineraryService = ItineraryService();
+  final TextEditingController _destinationController = TextEditingController();
+  final TextEditingController _daysController = TextEditingController(
+    text: '3',
+  );
 
-  // Sample generated itinerary data
-  final Map<String, List<Map<String, dynamic>>> _sampleItinerary = {
-    'Day 1': [
-      {
-        'time': '09:00 AM',
-        'activity': 'Arrival and Hotel Check-in',
-        'icon': Icons.hotel,
-        'details':
-            'Welcome to your destination! Get settled in your accommodation.',
-      },
-      {
-        'time': '12:00 PM',
-        'activity': 'Local Lunch Experience',
-        'icon': Icons.restaurant,
-        'details': 'Try authentic local cuisine at a popular restaurant.',
-      },
-      {
-        'time': '03:00 PM',
-        'activity': 'City Orientation Tour',
-        'icon': Icons.directions_walk,
-        'details': 'Explore the main attractions with a guided walking tour.',
-      },
-      {
-        'time': '07:00 PM',
-        'activity': 'Welcome Dinner',
-        'icon': Icons.dinner_dining,
-        'details':
-            'Enjoy a special dinner to celebrate the start of your trip.',
-      },
-    ],
-    'Day 2': [
-      {
-        'time': '08:00 AM',
-        'activity': 'Breakfast at Hotel',
-        'icon': Icons.free_breakfast,
-        'details': 'Start your day with a nutritious breakfast.',
-      },
-      {
-        'time': '10:00 AM',
-        'activity': 'Adventure Activity',
-        'icon': Icons.paragliding,
-        'details':
-            'Experience thrilling outdoor activities perfect for adventure lovers.',
-      },
-      {
-        'time': '02:00 PM',
-        'activity': 'Cultural Visit',
-        'icon': Icons.museum,
-        'details': 'Visit historical sites and immerse in the local culture.',
-      },
-      {
-        'time': '06:00 PM',
-        'activity': 'Sunset Viewpoint',
-        'icon': Icons.wb_twilight,
-        'details': 'Watch a beautiful sunset from a scenic location.',
-      },
-    ],
-    'Day 3': [
-      {
-        'time': '09:00 AM',
-        'activity': 'Nature Excursion',
-        'icon': Icons.forest,
-        'details': 'Explore natural wonders and scenic landscapes.',
-      },
-      {
-        'time': '01:00 PM',
-        'activity': 'Beachside Lunch',
-        'icon': Icons.beach_access,
-        'details': 'Enjoy a relaxing meal with ocean views.',
-      },
-      {
-        'time': '04:00 PM',
-        'activity': 'Souvenir Shopping',
-        'icon': Icons.shopping_bag,
-        'details': 'Buy mementos and gifts at local markets.',
-      },
-      {
-        'time': '08:00 PM',
-        'activity': 'Farewell Dinner',
-        'icon': Icons.celebration,
-        'details': 'End your trip with a special dining experience.',
-      },
-    ],
-  };
+  Itinerary? _generatedItinerary;
+  bool _isGeneratingItinerary = false;
+  String _errorMessage = '';
+  String? _shareableLink;
 
-  bool _showItinerary = false;
+  Future<void> _generateShareableLink() async {
+    if (_generatedItinerary == null) return;
 
-  // List of sample destinations
-  final List<String> _destinations = [
-    'Bali',
-    'Santorini',
-    'Kyoto',
-    'Paris',
-    'New York',
-    'Bangkok',
-    'Cairo',
-    'Sydney',
-  ];
+    try {
+      final link = await _itineraryService.generateShareableLink(
+        _generatedItinerary!,
+      );
+      setState(() {
+        _shareableLink = link;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to generate shareable link')),
+      );
+    }
+  }
 
-  // List of durations
-  final List<String> _durations = [
-    '1 day',
-    '2 days',
-    '3 days',
-    '5 days',
-    '7 days',
-    '10 days',
-    '14 days',
-  ];
+  Future<void> _downloadPDF() async {
+    if (_generatedItinerary == null) return;
 
-  // List of travel styles
-  final List<String> _travelStyles = [
-    'Adventure',
-    'Relaxation',
-    'Cultural',
-    'Culinary',
-    'Budget',
-    'Luxury',
-    'Family',
-    'Solo',
-  ];
+    try {
+      final pdf = pw.Document();
+
+      // Add title page
+      pdf.addPage(
+        pw.Page(
+          build:
+              (pw.Context context) => pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    '${_generatedItinerary!.days}-Day Itinerary',
+                    style: pw.TextStyle(
+                      fontSize: 24,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Text(
+                    'Destination: ${_generatedItinerary!.destination}',
+                    style: pw.TextStyle(fontSize: 18),
+                  ),
+                  pw.SizedBox(height: 20),
+                  pw.Text(
+                    'Generated on: ${DateTime.now().toString().split(' ')[0]}',
+                    style: pw.TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+        ),
+      );
+
+      // Add content pages
+      final content = _generatedItinerary!.content.split('\n');
+      final chunks = _chunkContent(content, 30); // 30 lines per page
+
+      for (final chunk in chunks) {
+        pdf.addPage(
+          pw.Page(
+            build:
+                (pw.Context context) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: chunk.map((line) => pw.Text(line)).toList(),
+                ),
+          ),
+        );
+      }
+
+      // Get downloads directory
+      Directory? downloadsDir;
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists()) {
+          downloadsDir = await getExternalStorageDirectory();
+        }
+      } else if (Platform.isIOS) {
+        downloadsDir = await getApplicationDocumentsDirectory();
+      } else {
+        downloadsDir = await getDownloadsDirectory();
+      }
+
+      if (downloadsDir == null) {
+        throw Exception('Could not access downloads directory');
+      }
+
+      // Create filename with timestamp to avoid overwriting
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename =
+          'itinerary_${_generatedItinerary!.destination.replaceAll(' ', '_')}_$timestamp.pdf';
+      final file = File('${downloadsDir.path}/$filename');
+
+      // Save the PDF
+      await file.writeAsBytes(await pdf.save());
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF saved to: ${file.path}'),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () {
+              // You might want to add a PDF viewer here
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
+    }
+  }
+
+  List<List<String>> _chunkContent(List<String> content, int chunkSize) {
+    List<List<String>> chunks = [];
+    for (var i = 0; i < content.length; i += chunkSize) {
+      chunks.add(
+        content.sublist(
+          i,
+          i + chunkSize > content.length ? content.length : i + chunkSize,
+        ),
+      );
+    }
+    return chunks;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              floating: true,
-              pinned: false,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              elevation: 0,
-              title: Row(
-                children: [
-                  Text(
-                    'Itinerary Creator',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 24,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(
-                    Icons.map_outlined,
-                    color: Theme.of(context).colorScheme.tertiary,
-                    size: 20,
-                  ),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    isDarkMode
-                        ? Icons.light_mode_rounded
-                        : Icons.dark_mode_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  onPressed: () {
-                    themeProvider.toggleTheme();
-                  },
-                ),
-                SizedBox(width: 8),
-              ],
+      appBar: AppBar(title: Text('Itinerary Builder')),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Itinerary Generator Section
+            Text(
+              'Generate Itinerary',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            SizedBox(height: 10),
+
+            // Destination Input
+            TextField(
+              controller: _destinationController,
+              decoration: InputDecoration(
+                labelText: 'Destination',
+                hintText: 'Enter a city, region or country',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
+              ),
+            ),
+            SizedBox(height: 15),
+
+            // Days Input
+            TextField(
+              controller: _daysController,
+              decoration: InputDecoration(
+                labelText: 'Number of Days',
+                hintText: '1-14 days',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.calendar_today),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 20),
+
+            // Generate Button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isGeneratingItinerary ? null : _generateItinerary,
+                child:
+                    _isGeneratingItinerary
+                        ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Text('Generating...'),
+                          ],
+                        )
+                        : Text('Generate Itinerary'),
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+
+            if (_errorMessage.isNotEmpty && !_isGeneratingItinerary)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(_errorMessage, style: TextStyle(color: Colors.red)),
+              ),
+
+            // Generated Itinerary Display
+            if (_generatedItinerary != null) ...[
+              SizedBox(height: 30),
+              Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (!_showItinerary) ...[
-                      _buildItineraryForm(context, isDarkMode),
-                    ] else ...[
-                      _buildGeneratedItinerary(context, isDarkMode),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildItineraryForm(BuildContext context, bool isDarkMode) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Intro card
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(context).colorScheme.tertiary,
-                Theme.of(context).colorScheme.primary,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.flight_takeoff, color: Colors.white, size: 32),
-              SizedBox(height: 12),
-              Text(
-                'Create Your Perfect Journey',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Fill out the details below and we\'ll generate a customized itinerary for your trip.',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 24),
-
-        Text(
-          'Trip Details',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onBackground,
-          ),
-        ),
-
-        SizedBox(height: 16),
-
-        // Destination Dropdown
-        Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              Icon(
-                Icons.location_on_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedDestination,
-                    isExpanded: true,
-                    hint: Text('Select Destination'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onBackground,
-                      fontSize: 16,
-                    ),
-                    dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                    items:
-                        _destinations.map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedDestination = newValue!;
-                      });
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 16),
-
-        // Duration Dropdown
-        Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                color: Theme.of(context).colorScheme.secondary,
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedDuration,
-                    isExpanded: true,
-                    hint: Text('Trip Duration'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onBackground,
-                      fontSize: 16,
-                    ),
-                    dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                    items:
-                        _durations.map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedDuration = newValue!;
-                      });
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 16),
-
-        // Travel Style Dropdown
-        Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              Icon(
-                Icons.interests_rounded,
-                color: Theme.of(context).colorScheme.tertiary,
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedTravelStyle,
-                    isExpanded: true,
-                    hint: Text('Travel Style'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onBackground,
-                      fontSize: 16,
-                    ),
-                    dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                    items:
-                        _travelStyles.map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                    onChanged: (newValue) {
-                      setState(() {
-                        _selectedTravelStyle = newValue!;
-                      });
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 24),
-
-        // Budget Slider
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: Color(0xFFAC6DDE),
-                  size: 20,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Daily Budget (USD)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: Theme.of(context).colorScheme.onBackground,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  '\$100',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _budgetValue,
-                    min: 100,
-                    max: 1000,
-                    divisions: 9,
-                    activeColor: Color(0xFFAC6DDE),
-                    inactiveColor: Color(0xFFAC6DDE).withOpacity(0.2),
-                    label: '\$${_budgetValue.round()}',
-                    onChanged: (newValue) {
-                      setState(() {
-                        _budgetValue = newValue;
-                      });
-                    },
-                  ),
-                ),
-                Text(
-                  '\$1000',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-
-        SizedBox(height: 32),
-
-        // Generate Itinerary Button
-        SizedBox(
-          width: double.infinity,
-          height: 55,
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _showItinerary = true;
-              });
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.auto_awesome, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Generate Itinerary',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.tertiary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-          ),
-        ),
-
-        SizedBox(height: 24),
-
-        // Travel tips
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color:
-                isDarkMode
-                    ? Colors.grey[800]!.withOpacity(0.4)
-                    : Colors.grey[100]!.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
-              width: 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.lightbulb_outline, color: Colors.amber, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Travel Tip',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.onBackground,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Text(
-                'For the best experience, consider the season you\'re traveling in. Different destinations offer unique experiences throughout the year.',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGeneratedItinerary(BuildContext context, bool isDarkMode) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Itinerary header
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.tertiary,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.map_rounded, color: Colors.white, size: 24),
-                  SizedBox(width: 10),
-                  Text(
-                    'Your Trip to $_selectedDestination',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildItineraryDetailChip(
-                    Icons.calendar_today_rounded,
-                    _selectedDuration,
-                  ),
-                  SizedBox(width: 12),
-                  _buildItineraryDetailChip(
-                    Icons.interests_rounded,
-                    _selectedTravelStyle,
-                  ),
-                  SizedBox(width: 12),
-                  _buildItineraryDetailChip(
-                    Icons.account_balance_wallet_rounded,
-                    '\$${_budgetValue.round()}/day',
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        SizedBox(height: 20),
-
-        // Back button and share/save actions
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _showItinerary = false;
-                });
-              },
-              icon: Icon(Icons.arrow_back_rounded, size: 18),
-              label: Text('Back'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.primary,
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () {},
-                  icon: Icon(Icons.ios_share_rounded),
-                  tooltip: 'Share',
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                IconButton(
-                  onPressed: () {},
-                  icon: Icon(Icons.save_alt_rounded),
-                  tooltip: 'Save',
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ],
-            ),
-          ],
-        ),
-
-        SizedBox(height: 24),
-
-        // Day-by-day itinerary
-        ..._sampleItinerary.entries.map((entry) {
-          String day = entry.key;
-          List<Map<String, dynamic>> activities = entry.value;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.tertiary.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Text(
-                    day,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                  ),
-                ),
-              ),
-              ...activities.map((activity) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey[800] : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
                         ),
-                      ],
+                      ),
+                      child: Text(
+                        '${_generatedItinerary!.days}-Day Itinerary for ${_generatedItinerary!.destination}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
+                    Padding(
+                      padding: EdgeInsets.all(16),
+                      child: MarkdownBody(
+                        data: _generatedItinerary!.content,
+                        selectable: true,
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: _getRandomColor(context).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                activity['icon'],
-                                color: _getRandomColor(context),
-                                size: 24,
-                              ),
-                            ),
+                          TextButton.icon(
+                            icon: Icon(Icons.share),
+                            label: Text('Share'),
+                            onPressed: () async {
+                              if (_shareableLink == null) {
+                                await _generateShareableLink();
+                              }
+                              if (_shareableLink != null) {
+                                await Share.share(_shareableLink!);
+                              }
+                            },
                           ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  activity['time'],
-                                  style: TextStyle(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  activity['activity'],
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                SizedBox(height: 6),
-                                Text(
-                                  activity['details'],
-                                  style: TextStyle(
-                                    color:
-                                        isDarkMode
-                                            ? Colors.grey[400]
-                                            : Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          SizedBox(width: 8),
+                          TextButton.icon(
+                            icon: Icon(Icons.save),
+                            label: Text('Save PDF'),
+                            onPressed: _downloadPDF,
                           ),
                         ],
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-              SizedBox(height: 16),
-            ],
-          );
-        }).toList(),
-
-        // Final notes section
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color:
-                isDarkMode
-                    ? Colors.grey[800]!.withOpacity(0.4)
-                    : Colors.grey[100]!,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Trip Notes',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '• This itinerary is customized based on your $_selectedTravelStyle preferences.\n'
-                '• All activities are within your daily budget of \$${_budgetValue.round()}.\n'
-                '• Times are flexible and can be adjusted as needed.\n'
-                '• Consider local transportation options between activities.',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.grey[300] : Colors.grey[800],
-                  fontSize: 14,
-                  height: 1.5,
+                  ],
                 ),
               ),
             ],
-          ),
+          ],
         ),
-
-        SizedBox(height: 24),
-
-        // Edit itinerary button
-        SizedBox(
-          width: double.infinity,
-          height: 55,
-          child: ElevatedButton(
-            onPressed: () {
-              // Implementation for editing itinerary
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.edit_outlined, size: 20),
-                SizedBox(width: 8),
-                Text(
-                  'Customize Itinerary',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.secondary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-          ),
-        ),
-
-        SizedBox(height: 40),
-      ],
-    );
-  }
-
-  Widget _buildItineraryDetailChip(IconData icon, String label) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 14),
-          SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Color _getRandomColor(BuildContext context) {
-    List<Color> colors = [
-      Theme.of(context).colorScheme.primary,
-      Theme.of(context).colorScheme.secondary,
-      Theme.of(context).colorScheme.tertiary,
-      Color(0xFFAC6DDE),
-    ];
-    return colors[DateTime.now().millisecond % colors.length];
+  Future<void> _generateItinerary() async {
+    // Validate inputs
+    final destination = _destinationController.text.trim();
+    if (destination.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a destination';
+      });
+      return;
+    }
+
+    int days;
+    try {
+      days = int.parse(_daysController.text.trim());
+      if (days < 1 || days > 14) {
+        setState(() {
+          _errorMessage = 'Days must be between 1 and 14';
+        });
+        return;
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Please enter a valid number of days';
+      });
+      return;
+    }
+
+    // Call API
+    setState(() {
+      _isGeneratingItinerary = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final itineraryData = await _itineraryService.generateItinerary(
+        destination,
+        days,
+      );
+      setState(() {
+        _generatedItinerary = Itinerary.fromJson(itineraryData);
+        _isGeneratingItinerary = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to generate itinerary. Please try again.';
+        _isGeneratingItinerary = false;
+      });
+    }
   }
 }

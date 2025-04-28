@@ -7,7 +7,7 @@ import 'package:yatrasahayak_app/screens/home_screen.dart';
 import 'package:yatrasahayak_app/screens/destinations_screen.dart';
 import 'package:yatrasahayak_app/screens/statistics_screen.dart';
 import 'package:yatrasahayak_app/screens/itinerary_screen.dart';
-import 'package:yatrasahayak_app/screens/profile_screen.dart';
+// import 'package:yatrasahayak_app/screens/profile_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 
@@ -124,9 +124,9 @@ class _MainScreenState extends State<MainScreen>
   static List<Widget> _screens = <Widget>[
     HomeScreen(),
     DestinationsScreen(),
-    StatisticsScreen(),
+    StatisticsScreen(destinationName: 'Default Destination'),
     ItineraryScreen(),
-    ProfileScreen(),
+    // ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -183,10 +183,10 @@ class _MainScreenState extends State<MainScreen>
                 icon: Icon(Icons.map_rounded),
                 label: 'Itinerary',
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_rounded),
-                label: 'Profile',
-              ),
+              // BottomNavigationBarItem(
+              //   icon: Icon(Icons.person_rounded),
+              //   label: 'Profile',
+              // ),
             ],
             currentIndex: _selectedIndex,
             unselectedItemColor:

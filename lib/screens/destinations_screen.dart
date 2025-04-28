@@ -1,41 +1,55 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yatrasahayak_app/theme/theme_provider.dart';
 import 'package:yatrasahayak_app/services/destination_service.dart';
+import 'package:yatrasahayak_app/screens/destination_detail_screen.dart';
 
 class DestinationsScreen extends StatefulWidget {
+  final String? initialSeason;
+
+  const DestinationsScreen({Key? key, this.initialSeason}) : super(key: key);
+
   @override
   _DestinationsScreenState createState() => _DestinationsScreenState();
 }
 
-class _DestinationsScreenState extends State<DestinationsScreen> with SingleTickerProviderStateMixin {
+class _DestinationsScreenState extends State<DestinationsScreen>
+    with SingleTickerProviderStateMixin {
   String _selectedSeason = 'Summer';
   late TabController _tabController;
-  
-  // Create an instance of the destination service
   final DestinationService _destinationService = DestinationService();
-  
-  // Map to store fetched recommendations for each season
-  Map<String, List<Map<String, dynamic>>> _destinationsBySeason = {
+
+  // Map to store destinations for each season
+  Map<String, List<Destination>> _destinationsBySeason = {
     'Spring': [],
     'Summer': [],
     'Autumn': [],
     'Winter': [],
+    'Monsoon': [],
   };
-  
+
   // Loading states for each season
   Map<String, bool> _isLoading = {
     'Spring': false,
     'Summer': false,
     'Autumn': false,
     'Winter': false,
+    'Monsoon': false,
+  };
+
+  // Error states for each season
+  Map<String, String> _errors = {
+    'Spring': '',
+    'Summer': '',
+    'Autumn': '',
+    'Winter': '',
+    'Monsoon': '',
   };
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
@@ -52,18 +66,47 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
             case 3:
               _selectedSeason = 'Winter';
               break;
+            case 4:
+              _selectedSeason = 'Monsoon';
+              break;
           }
         });
         // Fetch recommendations for the newly selected season
-        _fetchRecommendations(_selectedSeason);
+        _loadDestinations(_selectedSeason);
       }
     });
-    
-    // Default to Summer tab
-    _tabController.animateTo(1);
-    
-    // Fetch recommendations for the default season (Summer)
-    _fetchRecommendations('Summer');
+
+    // Set initial season if provided
+    if (widget.initialSeason != null) {
+      switch (widget.initialSeason) {
+        case 'Spring':
+          _tabController.animateTo(0);
+          _selectedSeason = 'Spring';
+          break;
+        case 'Summer':
+          _tabController.animateTo(1);
+          _selectedSeason = 'Summer';
+          break;
+        case 'Autumn':
+          _tabController.animateTo(2);
+          _selectedSeason = 'Autumn';
+          break;
+        case 'Winter':
+          _tabController.animateTo(3);
+          _selectedSeason = 'Winter';
+          break;
+        case 'Monsoon':
+          _tabController.animateTo(4);
+          _selectedSeason = 'Monsoon';
+          break;
+      }
+    } else {
+      // Default to Summer tab
+      _tabController.animateTo(1);
+    }
+
+    // Fetch recommendations for the initial season
+    _loadDestinations(_selectedSeason);
   }
 
   @override
@@ -71,46 +114,34 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
     _tabController.dispose();
     super.dispose();
   }
-  
-  // Fetch recommendations from the API
-  Future<void> _fetchRecommendations(String season) async {
+
+  Future<void> _loadDestinations(String season) async {
     // Skip if we already have data or are currently loading
     if (_destinationsBySeason[season]!.isNotEmpty || _isLoading[season]!) {
       return;
     }
-    
+
     setState(() {
       _isLoading[season] = true;
+      _errors[season] = '';
     });
-    
+
     try {
-      final recommendations = await _destinationService.getRecommendations(season, count: 5);
-      
+      final destinations = await _destinationService.getRecommendations(season);
       setState(() {
-        _destinationsBySeason[season] = recommendations;
+        _destinationsBySeason[season] = destinations;
         _isLoading[season] = false;
       });
     } catch (e) {
-      print('Error fetching recommendations: $e');
       setState(() {
+        _errors[season] = e.toString();
         _isLoading[season] = false;
-        // Set default values in case of error
-        _destinationsBySeason[season] = [
-          {
-            'name': 'Error loading destinations',
-            'country': 'Please try again later',
-            'description': 'Could not connect to the recommendation service.',
-            'rating': 0.0,
-            'color': Color(0xFFE53935),
-          }
-        ];
       });
     }
   }
 
   // Get season icon
   IconData _getSeasonIcon(String season) {
-    // Existing code remains the same
     switch (season) {
       case 'Spring':
         return Icons.eco_rounded;
@@ -120,6 +151,8 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
         return Icons.forest_rounded;
       case 'Winter':
         return Icons.ac_unit_rounded;
+      case 'Monsoon':
+        return Icons.water_drop_rounded;
       default:
         return Icons.landscape_rounded;
     }
@@ -127,7 +160,6 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
 
   // Get season color
   Color _getSeasonColor(String season) {
-    // Existing code remains the same
     switch (season) {
       case 'Spring':
         return Color(0xFF7ED957);
@@ -137,6 +169,8 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
         return Color(0xFFE17B77);
       case 'Winter':
         return Color(0xFF5DA7DB);
+      case 'Monsoon':
+        return Color(0xFF3D9970);
       default:
         return Color(0xFF5D69BE);
     }
@@ -144,7 +178,6 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    // Existing build method remains largely unchanged
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final themeProvider = Provider.of<ThemeProvider>(context);
     final seasonColor = _getSeasonColor(_selectedSeason);
@@ -153,7 +186,6 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
       body: SafeArea(
         child: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
-            // Existing code remains the same
             return [
               SliverAppBar(
                 floating: true,
@@ -179,13 +211,6 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                     onPressed: () {
                       themeProvider.toggleTheme();
                     },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.filter_list_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    onPressed: () {},
                   ),
                   SizedBox(width: 8),
                 ],
@@ -233,20 +258,6 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                           ),
                         ),
                         style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.tune_rounded,
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 20,
                       ),
                     ),
                   ],
@@ -328,6 +339,19 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                         ),
                       ),
                     ),
+                    Tab(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.water_drop_rounded),
+                            SizedBox(width: 8),
+                            Text('Monsoon'),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -382,7 +406,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
 
               SizedBox(height: 24),
 
-              // Destinations list with TabBarView
+              // Destinations list with TabBarView for swipe gesture
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
@@ -391,6 +415,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                     _buildDestinationsList('Summer'),
                     _buildDestinationsList('Autumn'),
                     _buildDestinationsList('Winter'),
+                    _buildDestinationsList('Monsoon'),
                   ],
                 ),
               ),
@@ -404,16 +429,14 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
   Widget _buildDestinationsList(String season) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final destinations = _destinationsBySeason[season] ?? [];
-    
+
     // Show loading indicator while fetching data
     if (_isLoading[season]!) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              color: _getSeasonColor(season),
-            ),
+            CircularProgressIndicator(color: _getSeasonColor(season)),
             SizedBox(height: 16),
             Text(
               'Finding best $season destinations...',
@@ -425,8 +448,51 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
         ),
       );
     }
-    
-    // Show empty state if no destinations and not loading
+
+    // Show error state
+    if (_errors[season]!.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+            SizedBox(height: 16),
+            Text(
+              'Error loading destinations',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.red[300],
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              _errors[season]!,
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                _loadDestinations(season);
+              },
+              icon: Icon(Icons.refresh),
+              label: Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _getSeasonColor(season),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show empty state if no destinations
     if (destinations.isEmpty) {
       return Center(
         child: Column(
@@ -449,7 +515,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
             SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () {
-                _fetchRecommendations(season);
+                _loadDestinations(season);
               },
               icon: Icon(Icons.refresh),
               label: Text('Retry'),
@@ -471,10 +537,8 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
       itemCount: destinations.length,
       itemBuilder: (context, index) {
         final destination = destinations[index];
-        Color cardColor = destination['color'] is int 
-            ? Color(destination['color']) 
-            : Color(0xFF38BDF8); // Default color
-            
+        Color cardColor = Color(destination.color);
+
         return Container(
           margin: EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
@@ -496,60 +560,66 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
             borderRadius: BorderRadius.circular(20),
             child: Column(
               children: [
-                Container(
-                  height: 160,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        cardColor,
-                        cardColor.withOpacity(0.8),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => DestinationDetailScreen(
+                              destination: destination,
+                            ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    height: 160,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [cardColor, cardColor.withOpacity(0.8)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                     ),
-                  ),
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Icon(
-                          Icons.landscape_rounded,
-                          size: 60,
-                          color: Colors.white70,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Icon(
+                            Icons.landscape_rounded,
+                            size: 60,
+                            color: Colors.white70,
+                          ),
                         ),
-                      ),
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.star, 
-                                color: Colors.amber, 
-                                size: 16
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                destination['rating'].toString(),
-                                style: TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                        Positioned(
+                          top: 16,
+                          right: 16,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.star, color: Colors.amber, size: 16),
+                                SizedBox(width: 4),
+                                Text(
+                                  destination.rating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
@@ -560,12 +630,17 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            destination['name'],
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.onBackground,
+                          Expanded(
+                            child: Text(
+                              destination.name,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    Theme.of(context).colorScheme.onBackground,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Container(
@@ -611,7 +686,7 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                           ),
                           SizedBox(width: 4),
                           Text(
-                            destination['country'],
+                            '${destination.city}, ${destination.state}',
                             style: TextStyle(
                               color:
                                   isDarkMode
@@ -624,11 +699,14 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                       ),
                       SizedBox(height: 12),
                       Text(
-                        destination['description'],
+                        destination.description ??
+                            'Explore this beautiful destination in ${destination.state} during $season season.',
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).colorScheme.onBackground,
                         ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: 16),
                       Row(
@@ -651,7 +729,17 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                           SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => DestinationDetailScreen(
+                                          destination: destination,
+                                        ),
+                                  ),
+                                );
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
                                     Theme.of(context).colorScheme.primary,
@@ -659,15 +747,16 @@ class _DestinationsScreenState extends State<DestinationsScreen> with SingleTick
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 padding: EdgeInsets.symmetric(vertical: 12),
-                             ),
-                             child: Text('View Details'),
+                              ),
+                              child: Text('View Details'),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-            )],
+              ],
             ),
           ),
         );
